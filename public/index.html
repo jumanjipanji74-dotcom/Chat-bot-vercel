@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>AI Assistant</title>
+  
   <!-- Google Fonts: DM Sans & Source Serif 4 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,7 +48,7 @@
       background-color: var(--bg-main);
     }
 
-    /* --- OVERLAY & SIDEBAR --- */
+    /* --- SIDEBAR OVERLAY & DRAWER --- */
     .sidebar-overlay {
       position: absolute;
       top: 0;
@@ -133,7 +134,6 @@
       font-size: 14px;
       color: var(--text-muted);
       cursor: pointer;
-      position: relative;
       transition: background 0.2s, color 0.2s;
     }
 
@@ -195,7 +195,7 @@
       gap: 28px;
     }
 
-    /* User Message */
+    /* User Message Bubble */
     .message-user {
       display: flex;
       justify-content: flex-end;
@@ -211,7 +211,7 @@
       line-height: 1.5;
     }
 
-    /* AI Message */
+    /* AI Message (Plain text, Source Serif 4, no bubble) */
     .message-ai {
       display: flex;
       flex-direction: column;
@@ -247,7 +247,7 @@
       color: var(--text);
     }
 
-    /* --- INPUT BAR --- */
+    /* --- STICKY INPUT BAR --- */
     .input-container {
       padding: 12px 16px 20px 16px;
       background-color: var(--bg-main);
@@ -361,15 +361,11 @@
 
       <div class="history-list">
         <div class="history-item">
-          <span>Analisis UI Mobile Design</span>
+          <span>Deployment Railway & Git</span>
           <button class="options-btn">⋯</button>
         </div>
         <div class="history-item">
-          <span>Riset Arsitektur Database</span>
-          <button class="options-btn">⋯</button>
-        </div>
-        <div class="history-item">
-          <span>Optimasi Performa Koden...</span>
+          <span>Desain UI Mobile Friendly</span>
           <button class="options-btn">⋯</button>
         </div>
       </div>
@@ -384,31 +380,16 @@
     <!-- CHAT MESSAGES CONTAINER -->
     <div class="chat-messages" id="chatMessages">
       
-      <!-- Contoh Pesan User -->
+      <!-- Pesan User -->
       <div class="message-user">
-        <div class="bubble">Tolong buatkan tampilan antarmuka chat yang responsif dan sesuai standar modern.</div>
+        <div class="bubble">Tolong perbarui antarmuka ini agar mobile friendly dan sesuai desain yang diminta.</div>
       </div>
 
-      <!-- Contoh Jawaban AI -->
+      <!-- Jawaban AI -->
       <div class="message-ai">
-        <div class="ai-text">Tentu, antarmuka dirancang menggunakan tipografi Source Serif 4 tanpa label atau latar belakang berlebihan agar interaksi terasa lebih alami dan bersih. Jarak serta warna telah disesuaikan dengan token yang diminta.</div>
+        <div class="ai-text">Antarmuka telah diperbarui sepenuhnya. Sidebar kini tersembunyi secara default dan muncul dari sisi kiri dengan efek blur, sementara area chat menggunakan tipografi Source Serif 4 tanpa bingkai berlebih.</div>
         <div class="ai-actions">
-          <button onclick="alert('Pesan disalin!')">Salin</button>
-          <span>•</span>
-          <button onclick="alert('Mengulangi respons...')">Ulangi</button>
-        </div>
-      </div>
-
-      <!-- Contoh Pesan User 2 -->
-      <div class="message-user">
-        <div class="bubble">Bagus! Pastikan input bar dan sidebar berfungsi dengan baik secara mulus.</div>
-      </div>
-
-      <!-- Contoh Jawaban AI 2 -->
-      <div class="message-ai">
-        <div class="ai-text">Animasi geser dari kiri untuk drawer dan efek latar belakang blur sudah diatur menggunakan CSS transisi standar. Textarea juga mendukung fitur otomatis bertambah tinggi saat kamu mengetik teks yang panjang.</div>
-        <div class="ai-actions">
-          <button onclick="alert('Pesan disalin!')">Salin</button>
+          <button onclick="alert('Teks disalin!')">Salin</button>
           <span>•</span>
           <button onclick="alert('Mengulangi respons...')">Ulangi</button>
         </div>
@@ -426,11 +407,9 @@
         <div class="input-bar-bottom">
           <select class="mode-select">
             <option>Tanya & Diskusi ▾</option>
-            <option>Analisis Dokumen</option>
-            <option>Mode Kreatif</option>
+            <option>Analisis Gambar</option>
           </select>
           <button class="send-btn" id="sendBtn" title="Kirim">
-            <!-- Icon Panah Atas -->
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
           </button>
         </div>
