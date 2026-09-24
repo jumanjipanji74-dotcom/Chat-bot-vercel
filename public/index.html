@@ -34,7 +34,6 @@
 
     .app-layout { display: flex; width: 100%; height: 100%; position: relative; }
 
-    /* Sidebar Desktop */
     .sidebar {
       width: 260px;
       height: 100%;
@@ -68,7 +67,6 @@
     }
     .history-item:hover, .history-item.active { background: var(--bg-raised); color: var(--text); }
 
-    /* Main Chat */
     .main-chat-container {
       flex: 1; height: 100%; display: flex; flex-direction: column;
       background-color: var(--bg-main); position: relative; max-width: 900px; margin: 0 auto;
@@ -87,7 +85,6 @@
       gap: 28px; 
     }
 
-    /* Welcome minimalis di tengah layar */
     .welcome-container {
       display: flex;
       flex-direction: column;
@@ -122,11 +119,14 @@
       font-family: 'Source Serif 4', serif; font-size: 16px;
       line-height: 1.7; color: var(--text); margin-bottom: 8px; word-break: break-word; white-space: pre-wrap;
     }
-    .ai-actions { display: flex; gap: 12px; font-size: 12px; color: var(--text-muted); }
+    .message-ai .ai-text strong {
+      font-weight: 700;
+      color: var(--text);
+    }
+    .ai-actions { display: flex; gap: 12px; font-size: 12px; color: var(--text-muted); opacity: 0; transition: opacity 0.3s; }
     .ai-actions button { background: none; border: none; color: var(--text-muted); cursor: pointer; font-family: 'DM Sans', sans-serif; }
     .ai-actions button:hover { color: var(--text); }
 
-    /* Indikator titik-titik mengetik (Typing indicator) */
     .typing-indicator {
       display: flex;
       gap: 4px;
@@ -148,7 +148,6 @@
       40% { transform: scale(1.0); }
     }
 
-    /* Input Bar */
     .input-container { padding: 16px 24px 24px 24px; background-color: var(--bg-main); }
     .input-bar {
       background-color: var(--bg-raised); border-radius: 22px; padding: 8px 12px;
@@ -167,7 +166,6 @@
       border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer;
     }
 
-    /* Mobile Responsive */
     @media screen and (max-width: 768px) {
       .sidebar { position: absolute; top: 0; left: 0; width: 70%; height: 100%; transform: translateX(-100%); }
       .sidebar.active { transform: translateX(0); }
@@ -192,9 +190,7 @@
         <button class="close-sidebar-btn" id="closeSidebar">✕</button>
       </div>
       <button class="new-chat-btn" id="newChatBtn"><span>+</span> Percakapan Baru</button>
-      <div class="history-list" id="historyList">
-        <!-- Daftar Sesi Riwayat -->
-      </div>
+      <div class="history-list" id="historyList"></div>
     </aside>
 
     <div class="main-chat-container">
@@ -254,15 +250,9 @@
     function showWelcomeMessage() {
       const hour = new Date().getHours();
       let greeting = 'Good evening';
-      if (hour >= 4 && hour < 11) {
-        greeting = 'Good morning';
-      } else if (hour >= 11 && hour < 15) {
-        greeting = 'Good afternoon';
-      } else if (hour >= 15 && hour < 18) {
-        greeting = 'Good evening';
-      } else {
-        greeting = 'Good night';
-      }
+      if (hour >= 4 && hour < 11) greeting = 'Good morning';
+      else if (hour >= 11 && hour < 15) greeting = 'Good afternoon';
+      else if (hour >= 15 && hour < 18) greeting = 'Good evening';
 
       const div = document.createElement('div');
       div.className = 'welcome-container';
@@ -302,7 +292,7 @@
           showWelcomeMessage();
         } else {
           messages.forEach(m => {
-            appendMessage(m.role === 'user' ? 'user' : 'ai', m.content);
+            appendStaticMessage(m.role === 'user' ? 'user' : 'ai', m.content);
           });
         }
         chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -314,20 +304,18 @@
       if (!text) return;
 
       const welcomeEl = chatMessages.querySelector('.welcome-container');
-      if (welcomeEl) {
-        welcomeEl.remove();
-      }
+      if (welcomeEl) welcomeEl.remove();
 
       textarea.value = '';
       textarea.style.height = 'auto';
-      appendMessage('user', text);
+      appendStaticMessage('user', text);
       chatMessages.scrollTop = chatMessages.scrollHeight;
 
       if (chatMessages.querySelectorAll('.message-user').length === 1) {
         headerTitle.innerText = text.length > 30 ? text.substring(0, 30) + '...' : text;
       }
 
-      // Tampilkan indikator mengetik (typing indicator)
+      // Indikator mengetik
       const typingDiv = document.createElement('div');
       typingDiv.className = 'message-ai';
       typingDiv.id = 'typingIndicator';
@@ -355,12 +343,11 @@
         });
         const data = await res.json();
         
-        // Hapus indikator mengetik
         const indicator = document.getElementById('typingIndicator');
         if (indicator) indicator.remove();
 
         if (res.ok) {
-          appendMessageWithTyping('ai', data.reply);
+          appendMessageWithTyping(data.reply);
           loadSessions();
         } else {
           alert(data.error || 'Terjadi kesalahan');
@@ -372,12 +359,7 @@
       }
     }
 
-    function appendMessage(sender, text) {
-      const welcomeEl = chatMessages.querySelector('.welcome-container');
-      if (welcomeEl) {
-        welcomeEl.remove();
-      }
-
+    function appendStaticMessage(sender, text) {
       if (sender === 'user') {
         const div = document.createElement('div');
         div.className = 'message-user';
@@ -386,9 +368,10 @@
       } else {
         const div = document.createElement('div');
         div.className = 'message-ai';
+        const parsed = formatMarkdown(text);
         div.innerHTML = `
-          <div class="ai-text">${escapeHtml(text)}</div>
-          <div class="ai-actions">
+          <div class="ai-text">${parsed}</div>
+          <div class="ai-actions" style="opacity: 1;">
             <button onclick="navigator.clipboard.writeText(this.closest('.message-ai').querySelector('.ai-text').innerText); alert('Disalin!');">Salin</button>
             <span>•</span>
             <button onclick="alert('Mengulangi...')">Ulangi</button>
@@ -398,18 +381,18 @@
       }
     }
 
-    // Fungsi khusus untuk efek animasi mengetik huruf per huruf (typing effect)
-    function appendMessageWithTyping(sender, text) {
-      const welcomeEl = chatMessages.querySelector('.welcome-container');
-      if (welcomeEl) {
-        welcomeEl.remove();
-      }
+    function formatMarkdown(text) {
+      // Mengubah **teks** menjadi tag <strong>teks</strong> secara aman
+      let escaped = escapeHtml(text);
+      return escaped.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    }
 
+    function appendMessageWithTyping(text) {
       const div = document.createElement('div');
       div.className = 'message-ai';
       div.innerHTML = `
         <div class="ai-text"></div>
-        <div class="ai-actions" style="opacity: 0; transition: opacity 0.3s;">
+        <div class="ai-actions">
           <button onclick="navigator.clipboard.writeText(this.closest('.message-ai').querySelector('.ai-text').innerText); alert('Disalin!');">Salin</button>
           <span>•</span>
           <button onclick="alert('Mengulangi...')">Ulangi</button>
@@ -420,23 +403,26 @@
       const textContainer = div.querySelector('.ai-text');
       const actionsContainer = div.querySelector('.ai-actions');
       
+      const parsedText = formatMarkdown(text);
       let i = 0;
-      const speed = 12; // Kecepatan mengetik (milidetik per karakter)
+      const speed = 10;
       
       function typeWriter() {
-        if (i < text.length) {
-          // Tangani karakter khusus HTML agar aman
-          let char = text.charAt(i);
-          if (char === '&') char = '&amp;';
-          else if (char === '<') char = '&lt;';
-          else if (char === '>') char = '&gt;';
+        if (i < parsedText.length) {
+          // Lewati tag HTML secara instan agar tidak merusak elemen parsing
+          if (parsedText.charAt(i) === '<') {
+            let tagEnd = parsedText.indexOf('>', i);
+            if (tagEnd !== -1) {
+              i = tagEnd + 1;
+            }
+          }
           
-          textContainer.innerHTML += char;
+          textContainer.innerHTML = parsedText.substring(0, i);
           i++;
           chatMessages.scrollTop = chatMessages.scrollHeight;
           setTimeout(typeWriter, speed);
         } else {
-          // Munculkan tombol aksi setelah selesai mengetik
+          textContainer.innerHTML = parsedText;
           actionsContainer.style.opacity = '1';
         }
       }
