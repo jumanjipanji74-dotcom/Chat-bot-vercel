@@ -196,6 +196,22 @@
     const historyList = document.getElementById('historyList');
     const newChatBtn = document.getElementById('newChatBtn');
     const modeSelect = document.getElementById('modeSelect');
+    const headerTitle = document.getElementById('headerTitle');
+
+    function showWelcomeMessage() {
+      const hour = new Date().getHours();
+      let greeting = 'Selamat malam';
+      if (hour >= 4 && hour < 11) {
+        greeting = 'Selamat pagi';
+      } else if (hour >= 11 && hour < 15) {
+        greeting = 'Selamat siang';
+      } else if (hour >= 15 && hour < 18) {
+        greeting = 'Selamat sore';
+      }
+
+      const welcomeText = `${greeting}. Mulai sesi baru. Sampaikan apa yang sedang kamu pikirkan atau hadapi saat ini tanpa alasan.`;
+      appendMessage('ai', welcomeText);
+    }
 
     async function loadSessions() {
       try {
@@ -208,8 +224,12 @@
           item.innerHTML = `<span>${escapeHtml(s.title)}</span>`;
           item.addEventListener('click', () => {
             currentSessionId = s.id;
+            headerTitle.innerText = s.title;
             loadMessages(s.id);
-            if (window.innerWidth <= 768) { closeDrawer(); }
+            if (window.innerWidth <= 768) { 
+              sidebar.classList.remove('active'); 
+              overlay.classList.remove('active'); 
+            }
           });
           historyList.appendChild(item);
         });
@@ -221,9 +241,13 @@
         const res = await fetch(`/api/sessions/${sessionId}/messages`);
         const messages = await res.json();
         chatMessages.innerHTML = '';
-        messages.forEach(m => {
-          appendMessage(m.role === 'user' ? 'user' : 'ai', m.content);
-        });
+        if (messages.length === 0) {
+          showWelcomeMessage();
+        } else {
+          messages.forEach(m => {
+            appendMessage(m.role === 'user' ? 'user' : 'ai', m.content);
+          });
+        }
         chatMessages.scrollTop = chatMessages.scrollHeight;
       } catch (e) { console.error(e); }
     }
@@ -236,6 +260,10 @@
       textarea.style.height = 'auto';
       appendMessage('user', text);
       chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      if (chatMessages.querySelectorAll('.message-user').length === 1) {
+        headerTitle.innerText = text.length > 30 ? text.substring(0, 30) + '...' : text;
+      }
 
       try {
         const res = await fetch('/api/chat', {
@@ -286,8 +314,13 @@
     newChatBtn.addEventListener('click', () => {
       currentSessionId = 'session_' + Date.now();
       chatMessages.innerHTML = '';
+      headerTitle.innerText = 'Percakapan Baru';
+      showWelcomeMessage();
       loadSessions();
-      if (window.innerWidth <= 768) { closeDrawer(); }
+      if (window.innerWidth <= 768) { 
+        sidebar.classList.remove('active'); 
+        overlay.classList.remove('active'); 
+      }
     });
 
     sendBtn.addEventListener('click', sendMessage);
@@ -296,6 +329,7 @@
     });
 
     loadSessions();
+    showWelcomeMessage();
   </script>
 </body>
 </html>
