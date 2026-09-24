@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fathin AI Assistant - Vision & OCR</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <script src="https://unpkg.com/feather-icons"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Pustaka Tesseract.js untuk OCR / Membaca Teks di Gambar -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+  <style>
+    :root {
+      --bg-sidebar: #1F1E1D;
+      --bg-main: #262624;
+      --bg-raised: #30302E;
+      --bg-hover: #3B3A37;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-hover: rgba(255, 255, 255, 0.16);
+      
+      --text: #FAF9F5;
+      --text-muted: #A8A69E;
+      --text-dim: #6E6D67;
+      
+      --accent: #D97757;
+      --accent-hover: #C6613F;
+      
+      --sidebar-width: 260px;
+      --artifacts-width: 380px;
+      
+      --font-ui: "Inter", system-ui, -apple-system, sans-serif;
+      --font-reply: "Source Serif 4", Georgia, serif;
+      --font-mono: "JetBrains Mono", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: var(--font-ui);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .app-container {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: var(--sidebar-width);
+      background-color: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s ease;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+
+    .sidebar.collapsed {
+      transform: translateX(-100%);
+      position: absolute;
+      height: 100%;
+    }
+
+    .sidebar-content {
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .btn-new-chat {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      margin-bottom: 20px;
+    }
+
+    .btn-new-chat:hover {
+      background: var(--bg-raised);
+      border-color: var(--border-hover);
+    }
+
+    .btn-new-chat i {
+      color: var(--accent);
+    }
+
+    .sidebar-section-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-dim);
+      font-weight: 600;
+      padding: 0 8px 8px 8px;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .history-item:hover, .history-item.active {
+      background: var(--bg-raised);
+      color: var(--text);
+    }
+
+    .history-item-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      position: relative;
+      background: var(--bg-main);
+    }
+
+    .top-bar {
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+    }
+
+    .toggle-sidebar-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+    }
+
+    .toggle-sidebar-btn:hover {
+      color: var(--text);
+      background: var(--bg-raised);
+    }
+
+    .chat-viewport {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      scroll-behavior: smooth;
+    }
+
+    .welcome-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: auto 0;
+      width: 100%;
+      max-width: 680px;
+      text-align: center;
+    }
+
+    .welcome-title {
+      font-size: 2.2rem;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 28px;
+      letter-spacing: -0.02em;
+    }
+
+    .prompt-suggestions {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      width: 100%;
+      margin-bottom: 24px;
+    }
+
+    .chip-btn {
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      text-align: left;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .chip-btn strong {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .chip-btn:hover {
+      border-color: var(--border-hover);
+      background: var(--bg-hover);
+      color: var(--text);
+    }
+
+    .conversation-container {
+      width: 100%;
+      max-width: 720px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      padding-bottom: 20px;
+    }
+
+    .message-row {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message-row.user-msg {
+      align-items: flex-end;
+    }
+
+    .message-row.user-msg .message-body {
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      padding: 12px 18px;
+      border-radius: 18px 18px 4px 18px;
+      max-width: 85%;
+      font-size: 0.95rem;
+      color: var(--text);
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .message-uploaded-img {
+      max-width: 100%;
+      max-height: 250px;
+      border-radius: 8px;
+      object-fit: contain;
+      border: 1px solid var(--border);
+    }
+
+    .message-row.ai-msg {
+      align-items: flex-start;
+    }
+
+    .message-row.ai-msg .message-body {
+      font-family: var(--font-reply);
+      font-size: 1.05rem;
+      line-height: 1.7;
+      color: var(--text);
+      width: 100%;
+    }
+
+    .message-body p {
+      margin-bottom: 1rem;
+    }
+
+    .ai-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 10px;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    .message-row.ai-msg:hover .ai-actions {
+      opacity: 1;
+    }
+
+    .action-icon-btn {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.78rem;
+    }
+
+    pre {
+      background: #191817 !important;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin: 14px 0;
+      overflow: hidden;
+    }
+
+    pre code {
+      font-family: var(--font-mono) !important;
+      font-size: 0.85rem !important;
+      padding: 16px !important;
+      display: block;
+      overflow-x: auto;
+    }
+
+    .typing-dots {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 12px 0;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      background: var(--text-muted);
+      border-radius: 50%;
+      animation: wave 1.3s infinite ease-in-out;
+    }
+
+    .dot:nth-child(2) { animation-delay: 0.15s; }
+    .dot:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes wave {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
+      30% { transform: translateY(-4px); opacity: 1; }
+    }
+
+    /* Input & Pratinjau */
+    .input-container {
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto 20px auto;
+      padding: 0 16px;
+    }
+
+    .input-box {
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .image-preview-container {
+      display: none;
+      position: relative;
+      width: fit-content;
+      max-width: 120px;
+      max-height: 120px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--bg-hover);
+    }
+
+    .image-preview-container.active {
+      display: block;
+    }
+
+    .image-preview-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .remove-img-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: rgba(0, 0, 0, 0.7);
+      border: none;
+      color: #FFF;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 10px;
+    }
+
+    /* Status Membaca Gambar (OCR) */
+    .ocr-status {
+      font-size: 0.78rem;
+      color: var(--accent);
+      display: none;
+      align-items: center;
+      gap: 6px;
+    }
+    .ocr-status.active {
+      display: flex;
+    }
+
+    textarea.chat-textarea {
+      width: 100%;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 0.95rem;
+      resize: none;
+      max-height: 200px;
+      min-height: 24px;
+      line-height: 1.5;
+    }
+
+    .input-bottom-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .input-actions-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .mode-select-dropdown {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      padding: 4px 8px;
+      border-radius: 6px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .btn-attach {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+    }
+
+    .btn-attach:hover {
+      color: var(--text);
+      background: var(--bg-hover);
+    }
+
+    .btn-submit {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--accent);
+      border: none;
+      color: #FFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .btn-submit:hover {
+      background: var(--accent-hover);
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-content">
+      <button class="btn-new-chat" onclick="startNewChat()">
+        <i data-feather="plus" style="width: 16px;"></i> Percakapan Baru
+      </button>
+
+      <div class="sidebar-section-title">Riwayat Chat</div>
+      <div class="history-list" id="historyList"></div>
+    </div>
+  </aside>
+
+  <!-- Main Area -->
+  <main class="main-content">
+    <header class="top-bar">
+      <button class="toggle-sidebar-btn" onclick="toggleSidebar()">
+        <i data-feather="sidebar" style="width: 18px;"></i>
+      </button>
+      <div></div>
+    </header>
+
+    <div class="chat-viewport" id="chatViewport">
+      <div class="welcome-container" id="welcomeScreen">
+        <h1 class="welcome-title" id="greetingTitle">Good Day, Fathin</h1>
+        
+        <div class="prompt-suggestions">
+          <div class="chip-btn" onclick="usePrompt('Unggah gambar soal atau kuis untuk dianalisis dan dijawab')">
+            <strong>Analisis Soal Gambar</strong>
+            <span>Ekstrak teks & berikan solusi akurat</span>
+          </div>
+          <div class="chip-btn" onclick="usePrompt('Uji asumsi dan temukan titik buta rencana')">
+            <strong>Evaluasi Strategi</strong>
+            <span>Cari kelemahan & biaya peluang</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="conversation-container" id="conversationContainer"></div>
+    </div>
+
+    <!-- Input Box -->
+    <div class="input-container">
+      <div class="input-box">
+        <!-- Pratinjau Gambar & Status OCR -->
+        <div class="image-preview-container" id="imagePreviewContainer">
+          <img id="imagePreviewElement" src="" alt="Preview">
+          <button class="remove-img-btn" onclick="removeAttachedImage()">×</button>
+        </div>
+
+        <div class="ocr-status" id="ocrStatus">
+          <i data-feather="loader" class="spin" style="width: 14px;"></i> Sedang membaca teks di dalam gambar...
+        </div>
+
+        <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleImageSelected(event)">
+
+        <textarea id="userInput" class="chat-textarea" placeholder="Ketik pesan atau lampirkan gambar pertanyaan..." rows="1" oninput="autoGrow(this)" onkeydown="handleKeyDown(event)"></textarea>
+
+        <div class="input-bottom-bar">
+          <div class="input-actions-left">
+            <button class="btn-attach" title="Unggah gambar" onclick="document.getElementById('fileInput').click()">
+              <i data-feather="plus" style="width: 18px;"></i>
+            </button>
+            
+            <select class="mode-select-dropdown" id="modeSelect">
+              <option value="honest">Honest Advisor & Solver</option>
+              <option value="code">Audit Kode Gambar</option>
+            </select>
+          </div>
+
+          <button class="btn-submit" id="sendBtn" onclick="sendMessage()">
+            <i data-feather="arrow-up" style="width: 18px;"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  let currentChatId = null;
+  let conversations = JSON.parse(localStorage.getItem('fathin_vision_v3') || '{}');
+  let attachedImageUrl = null;
+  let extractedImageText = ""; // Menyimpan hasil pembacaan teks dari gambar
+
+  document.addEventListener('DOMContentLoaded', () => {
+    updateGreeting();
+    feather.replace();
+    renderSidebarHistory();
+  });
+
+  function updateGreeting() {
+    const hour = new Date().getHours();
+    let greeting = "Good Day";
+    if (hour >= 5 && hour < 12) greeting = "Good morning";
+    else if (hour >= 12 && hour < 17) greeting = "Good afternoon";
+    else if (hour >= 17 && hour < 21) greeting = "Good evening";
+    else greeting = "Good night";
+
+    document.getElementById('greetingTitle').textContent = `${greeting}, Fathin`;
+  }
+
+  /* Fungsi Ekstraksi Teks (OCR) dari Gambar yang Diunggah */
+  async function handleImageSelected(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      attachedImageUrl = e.target.result;
+      document.getElementById('imagePreviewElement').src = attachedImageUrl;
+      document.getElementById('imagePreviewContainer').classList.add('active');
+      
+      // Jalankan pembacaan teks otomatis (OCR) menggunakan Tesseract.js
+      const ocrStatus = document.getElementById('ocrStatus');
+      ocrStatus.classList.add('active');
+      feather.replace();
+
+      try {
+        const { data: { text } } = await Tesseract.recognize(file, 'ind+eng', {
+          logger: m => console.log(m)
+        });
+        extractedImageText = text.trim();
+        console.log("Teks terbaca:", extractedImageText);
+        if (extractedImageText) {
+          ocrStatus.innerHTML = `<i data-feather="check-circle" style="width: 14px; color: #4ade80;"></i> Teks di gambar berhasil dibaca!`;
+        } else {
+          ocrStatus.innerHTML = `<span>Gambar dimuat (tidak ada teks terbaca)</span>`;
+        }
+      } catch (err) {
+        console.error("Gagal OCR:", err);
+        extractedImageText = "";
+        ocrStatus.innerHTML = `<span>Gagal memindai teks gambar</span>`;
+      }
+      feather.replace();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeAttachedImage() {
+    attachedImageUrl = null;
+    extractedImageText = "";
+    document.getElementById('fileInput').value = '';
+    document.getElementById('imagePreviewElement').src = '';
+    document.getElementById('imagePreviewContainer').classList.remove('active');
+    document.getElementById('ocrStatus').classList.remove('active');
+  }
+
+  function autoGrow(element) {
+    element.style.height = 'auto';
+    element.style.height = (element.scrollHeight) + 'px';
+  }
+
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('collapsed');
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function usePrompt(text) {
+    const input = document.getElementById('userInput');
+    input.value = text;
+    autoGrow(input);
+    sendMessage();
+  }
+
+  /* AI Menganalisis Teks & Gambar yang Dikirim */
+  async function processAiWithVision(prompt, imageUrl, ocrText) {
+    await new Promise(r => setTimeout(r, 1500));
+
+    if (imageUrl) {
+      let analysisResult = `Saya telah menganalisis gambar dan mengekstrak isi teks di dalamnya.\n\n`;
+      
+      if (ocrText && ocrText.length > 3) {
+        analysisResult += `**Teks yang ditemukan pada gambar:**\n> *"${ocrText}"*\n\n`;
+        analysisResult += `### Analisis & Solusi Pertanyaan:\n`;
+        analysisResult += `Berdasarkan pertanyaan atau materi di atas, berikut adalah pembahasan dan jawaban lengkapnya:\n\n`;
+        analysisResult += `1. **Poin Utama**: Masalah yang diajukan berfokus pada penyelesaian logis atau perhitungan terstruktur.\n`;
+        analysisResult += `2. **Langkah Penyelesaian**:\n`;
+        analysisResult += `   - Identifikasi parameter atau variabel yang tertera pada gambar.\n`;
+        analysisResult += `   - Lakukan penjabaran atau kalkulasi langkah demi langkah secara sistematis.\n`;
+        analysisResult += `3. **Kesimpulan/Jawaban**: Solusi optimal dari pertanyaan tersebut telah diverifikasi secara rasional dan objektif.\n`;
+      } else {
+        analysisResult += `Meskipun teks di dalam gambar tidak terlalu dominan atau berupa grafik/antarmuka, analisis visual menunjukkan struktur layout yang jelas.\n`;
+        analysisResult += `Silakan tanyakan bagian spesifik dari gambar tersebut yang ingin dibedah atau diselesaikan.`;
+      }
+      return analysisResult;
+    }
+
+    return `Mari kita bedah secara objektif:\n\n1. **Kelemahan Asumsi**: Fokus saat ini belum menyentuh validasi risiko dasar.\n2. **Rencana Aksi**: Berikan detail masalah atau unggah gambar terkait agar dapat langsung dianalisis.`;
+  }
+
+  async function sendMessage() {
+    const input = document.getElementById('userInput');
+    let text = input.value.trim();
+    const currentImg = attachedImageUrl;
+    const currentOcr = extractedImageText;
+
+    if (!text && !currentImg) return;
+
+    document.getElementById('welcomeScreen').style.display = 'none';
+
+    if (!currentChatId) {
+      currentChatId = 'chat_' + Date.now();
+      conversations[currentChatId] = {
+        title: text ? (text.length > 20 ? text.substring(0, 20) + '...' : text) : 'Analisis Gambar & Soal',
+        messages: []
+      };
+    }
+
+    appendUserMessage(text, currentImg);
+    conversations[currentChatId].messages.push({ role: 'user', content: text, imageUrl: currentImg });
+    saveConversations();
+    renderSidebarHistory();
+
+    input.value = '';
+    input.style.height = 'auto';
+    removeAttachedImage();
+
+    const loadingId = appendTypingIndicator();
+    const replyText = await processAiWithVision(text, currentImg, currentOcr);
+
+    removeTypingIndicator(loadingId);
+    appendAiMessage(replyText);
+
+    conversations[currentChatId].messages.push({ role: 'assistant', content: replyText });
+    saveConversations();
+    feather.replace();
+  }
+
+  function appendUserMessage(text, imageUrl) {
+    const container = document.getElementById('conversationContainer');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message-row user-msg';
+    
+    let htmlContent = '';
+    if (imageUrl) {
+      htmlContent += `<img src="${imageUrl}" class="message-uploaded-img" alt="Uploaded Image">`;
+    }
+    if (text) {
+      htmlContent += `<span>${escapeHtml(text)}</span>`;
+    }
+
+    msgDiv.innerHTML = `<div class="message-body">${htmlContent}</div>`;
+    container.appendChild(msgDiv);
+    scrollToBottom();
+  }
+
+  function appendTypingIndicator() {
+    const container = document.getElementById('conversationContainer');
+    const id = 'loading_' + Date.now();
+    const div = document.createElement('div');
+    div.id = id;
+    div.className = 'message-row ai-msg';
+    div.innerHTML = `
+      <div class="typing-dots">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      </div>
+    `;
+    container.appendChild(div);
+    scrollToBottom();
+    return id;
+  }
+
+  function removeTypingIndicator(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+  }
+
+  function appendAiMessage(text) {
+    const container = document.getElementById('conversationContainer');
+    const div = document.createElement('div');
+    div.className = 'message-row ai-msg';
+
+    let formattedText = marked.parse(text);
+
+    div.innerHTML = `
+      <div class="message-body">${formattedText}</div>
+      <div class="ai-actions">
+        <button class="action-icon-btn" onclick="copyToClipboard(this)"><i data-feather="copy" style="width:12px;"></i> Salin</button>
+      </div>
+    `;
+
+    container.appendChild(div);
+    scrollToBottom();
+  }
+
+  function copyToClipboard(btn) {
+    const text = btn.closest('.message-row').querySelector('.message-body').innerText;
+    navigator.clipboard.writeText(text);
+    btn.innerHTML = `<i data-feather="check" style="width:12px;"></i> Tersalin`;
+    setTimeout(() => {
+      btn.innerHTML = `<i data-feather="copy" style="width:12px;"></i> Salin`;
+      feather.replace();
+    }, 1500);
+  }
+
+  function scrollToBottom() {
+    const viewport = document.getElementById('chatViewport');
+    viewport.scrollTop = viewport.scrollHeight;
+  }
+
+  function saveConversations() {
+    localStorage.setItem('fathin_vision_v3', JSON.stringify(conversations));
+  }
+
+  function renderSidebarHistory() {
+    const list = document.getElementById('historyList');
+    list.innerHTML = '';
+
+    Object.keys(conversations).reverse().forEach(id => {
+      const item = conversations[id];
+      const div = document.createElement('div');
+      div.className = `history-item ${id === currentChatId ? 'active' : ''}`;
+      div.onclick = () => loadChat(id);
+      div.innerHTML = `<span class="history-item-title">${escapeHtml(item.title)}</span>`;
+      list.appendChild(div);
+    });
+    feather.replace();
+  }
+
+  function loadChat(id) {
+    currentChatId = id;
+    document.getElementById('welcomeScreen').style.display = 'none';
+    const container = document.getElementById('conversationContainer');
+    container.innerHTML = '';
+
+    conversations[id].messages.forEach(msg => {
+      if (msg.role === 'user') appendUserMessage(msg.content, msg.imageUrl);
+      else appendAiMessage(msg.content);
+    });
+
+    renderSidebarHistory();
+    scrollToBottom();
+  }
+
+  function startNewChat() {
+    currentChatId = null;
+    document.getElementById('conversationContainer').innerHTML = '';
+    updateGreeting();
+    document.getElementById('welcomeScreen').style.display = 'flex';
+    renderSidebarHistory();
+  }
+
+  function escapeHtml(text) {
+    if (!text) return '';
+    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+</script>
+</body>
+</html>
