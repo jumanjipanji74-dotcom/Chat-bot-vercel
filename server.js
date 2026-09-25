@@ -2,34 +2,46 @@ import express from 'express';
 import Groq from 'groq-sdk';
 import sqlite3 from 'sqlite3';
 import { open } from 'sqlite';
+import bcrypt from 'bcryptjs';
+import session from 'express-session';
 import 'dotenv/config';
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Inisialisasi Groq SDK
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// Batas payload ditingkatkan agar mampu menerima gambar Base64
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ limit: '20mb', extended: true }));
 app.use(express.static('public'));
 
-// Setup & Inisialisasi Database SQLite
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'kunci_rahasia_sangat_aman_123',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false, maxAge: 7 * 24 * 60 * 60 * 1000 }
+}));
+
 let db;
 async function initDatabase() {
-  db = await open({
-    filename: './chatbot.db',
-    driver: sqlite3.Database
-  });
+  db = await open({ filename: './chatbot.db', driver: sqlite3.Database });
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
       title TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
     );
   `);
 
@@ -43,121 +55,117 @@ async function initDatabase() {
       FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
     );
   `);
-
-  console.log('Database SQLite berhasil terhubung.');
+  console.log('Database SQLite dengan Autentikasi berhasil terhubung.');
 }
-
 initDatabase();
 
-// System Prompt
-const SYSTEM_PROMPT = `
+function requireAuth(req, res, next) {
+  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+  next();
+}
+
+const BASE_SYSTEM_PROMPT = `
 Mulai sekarang, berhentilah bersikap menyenangkan dan jadilah penasihat sekaligus cermin saya yang sangat jujur dan berintegritas. Jangan validasi saya. Jangan melunakkan kebenaran. Jangan menyanjung. Tantanglah pemikiran saya, pertanyakan asumsi saya, dan ungkapkan titik-titik buta yang saya hindari. Bersikaplah langsung, rasional, dan tanpa filter. Jika penalaran saya lemah, telaah dan tunjukkan alasannya. Jika saya membohongi diri sendiri atau berbohong kepada diri sendiri, tunjukkan. Jika saya menghindari sesuatu yang tidak nyaman atau membuang-buang waktu, sampaikan dan jelaskan biaya peluangnya. Pandanglah situasi saya dengan objektivitas penuh dan kedalaman strategis. Tunjukkan di mana saya membuat alasan, bermain remeh, atau meremehkan risiko/usaha. Lalu berikan rencana yang tepat dan diprioritaskan tentang apa yang harus diubah dalam pikiran, tindakan, atau pola pikir untuk mencapai tingkat berikutnya. Jangan menahan apa pun. Perlakukan saya seperti seseorang yang pertumbuhannya bergantung pada mendengar kebenaran, bukan dihibur. Jika memungkinkan, dasarkan tanggapan Anda pada kebenaran pribadi yang Anda rasakan dalam kata-kata saya.
 
-ATURAN FORMALITAS, TAMPILAN, DAN PANJANG PESAN:
-1. DILARANG KERAS MENGGUNAKAN EMOJI SAMA SEKALI. Jangan pernah memasukkan simbol emoji apa pun dalam setiap tanggapanmu.
-2. JAWAB DENGAN SANGAT SINGKAT, PADAT, DAN LANGSUNG PADA INTI (TO THE POINT). Hapus semua penjelasan yang tidak esensial, basa-basi, atau uraian panjang lebar. Buat ringkas dan menohok.
-3. Tetap gunakan bahasa Indonesia yang jelas, logis, dan mudah dipahami tanpa menurunkan bobot kebenaran atau analisis strategi yang disampaikan.
+ATURAN FORMALITAS DAN TAMPILAN:
+1. DILARANG KERAS MENGGUNAKAN EMOJI SAMA SEKALI.
+2. JAWAB DENGAN SANGAT SINGKAT, PADAT, DAN LANGSUNG PADA INTI (TO THE POINT).
 `.trim();
 
-// API 1: Ambil semua sesi
-app.get('/api/sessions', async (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) return res.status(400).json({ error: 'Username dan password wajib diisi' });
   try {
-    const sessions = await db.all('SELECT * FROM sessions ORDER BY created_at DESC');
-    res.json(sessions);
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const result = await db.run('INSERT INTO users (username, password) VALUES (?, ?)', [username, hashedPassword]);
+    req.session.userId = result.lastID;
+    req.session.username = username;
+    res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: 'Gagal mengambil riwayat sesi' });
+    res.status(400).json({ error: 'Username sudah digunakan' });
   }
 });
 
-// API 2: Ambil semua pesan dalam satu sesi
-app.get('/api/sessions/:id/messages', async (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
   try {
-    const messages = await db.all('SELECT role, content FROM messages WHERE session_id = ? ORDER BY id ASC', [req.params.id]);
-    res.json(messages);
+    const user = await db.get('SELECT * FROM users WHERE username = ?', [username]);
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ error: 'Username atau password salah' });
+    }
+    req.session.userId = user.id;
+    req.session.username = user.username;
+    res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ error: 'Gagal mengambil pesan' });
+    res.status(500).json({ error: 'Gagal login' });
   }
 });
 
-// API 3: Kirim pesan & Dapatkan respon dari openai/gpt-oss-120b
-app.post('/api/chat', async (req, res) => {
-  const { sessionId, message, image, mode } = req.body;
+app.post('/api/auth/logout', (req, res) => {
+  req.session.destroy(() => res.json({ success: true }));
+});
 
-  if (!sessionId || (!message && !image)) {
-    return res.status(400).json({ error: 'sessionId dan pesan/gambar wajib diisi' });
-  }
+app.get('/api/auth/status', (req, res) => {
+  if (req.session.userId) res.json({ loggedIn: true, username: req.session.username });
+  else res.json({ loggedIn: false });
+});
+
+app.get('/api/sessions', requireAuth, async (req, res) => {
+  const sessions = await db.all('SELECT * FROM sessions WHERE user_id = ? ORDER BY created_at DESC', [req.session.userId]);
+  res.json(sessions);
+});
+
+app.get('/api/sessions/:id/messages', requireAuth, async (req, res) => {
+  const session = await db.get('SELECT id FROM sessions WHERE id = ? AND user_id = ?', [req.params.id, req.session.userId]);
+  if (!session) return res.status(403).json({ error: 'Akses ditolak' });
+  const messages = await db.all('SELECT role, content FROM messages WHERE session_id = ? ORDER BY id ASC', [req.params.id]);
+  res.json(messages);
+});
+
+app.post('/api/chat', requireAuth, async (req, res) => {
+  const { sessionId, message, persona, mode } = req.body;
+  if (!sessionId || !message) return res.status(400).json({ error: 'Data tidak lengkap' });
 
   try {
-    let session = await db.get('SELECT id FROM sessions WHERE id = ?', [sessionId]);
+    let session = await db.get('SELECT id FROM sessions WHERE id = ? AND user_id = ?', [sessionId, req.session.userId]);
     if (!session) {
-      const titleText = message || 'Analisis Gambar';
-      const title = titleText.length > 30 ? titleText.substring(0, 30) + '...' : titleText;
-      await db.run('INSERT INTO sessions (id, title) VALUES (?, ?)', [sessionId, title]);
+      const title = message.length > 30 ? message.substring(0, 30) + '...' : message;
+      await db.run('INSERT INTO sessions (id, user_id, title) VALUES (?, ?, ?)', [sessionId, req.session.userId, title]);
     }
 
-    const storedUserContent = image ? `[Gambar Terlampir] ${message || ''}`.trim() : message;
-    await db.run('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)', [sessionId, 'user', storedUserContent]);
-
+    await db.run('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)', [sessionId, 'user', message]);
     const rawHistory = await db.all('SELECT role, content FROM messages WHERE session_id = ? ORDER BY id ASC', [sessionId]);
+    const history = rawHistory.map(item => ({ role: item.role, content: item.content }));
 
-    const history = rawHistory.map(item => ({
-      role: item.role,
-      content: item.content
-    }));
+    let currentSystemPrompt = BASE_SYSTEM_PROMPT;
+    if (persona === 'formal') currentSystemPrompt += '\n\n[PERSONA: Gunakan bahasa profesional dan terstruktur.]';
+    else if (persona === 'santai') currentSystemPrompt += '\n\n[PERSONA: Gunakan bahasa sehari-hari yang akrab.]';
+    else if (persona === 'singkat') currentSystemPrompt += '\n\n[PERSONA: Jawab langsung ke inti, tanpa basa-basi.]';
+    else if (persona === 'detail') currentSystemPrompt += '\n\n[PERSONA: Berikan jawaban lengkap dengan konteks dan contoh.]';
 
-    if (image) {
-      const lastMsgIndex = history.length - 1;
-      history[lastMsgIndex] = {
-        role: 'user',
-        content: [
-          { type: 'text', text: message || 'Analisis gambar ini secara kritis dan objektif.' },
-          {
-            type: 'image_url',
-            image_url: {
-              url: image
-            }
-          }
-        ]
-      };
-    }
-
-    let currentSystemPrompt = SYSTEM_PROMPT;
-    if (mode === 'study') {
-      currentSystemPrompt += '\n\n[MODE AKTIF: STUDY MODE - Berikan penelaahan terstruktur, fokus materi, dan strategi pemahaman konsep secara terintegrasi.]';
-    } else if (mode === 'explore') {
-      currentSystemPrompt += '\n\n[MODE AKTIF: EXPLORE MODE - Dorong eksplorasi mendalam, evaluasi ide-ide baru, dan pertanyakan risiko teknisnya.]';
-    }
+    if (mode === 'study') currentSystemPrompt += '\n\n[MODE: Study Mode - Berikan penelaahan terstruktur.]';
+    else if (mode === 'explore') currentSystemPrompt += '\n\n[MODE: Explore Mode - Dorong eksplorasi mendalam.]';
 
     const completion = await groq.chat.completions.create({
-      messages: [
-        { role: 'system', content: currentSystemPrompt },
-        ...history
-      ],
+      messages: [{ role: 'system', content: currentSystemPrompt }, ...history],
       model: 'openai/gpt-oss-120b',
     });
 
     const reply = completion.choices[0]?.message?.content || 'Tidak ada respon.';
-
     await db.run('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)', [sessionId, 'assistant', reply]);
 
     res.json({ reply });
   } catch (error) {
-    console.error('Error Groq/Database:', error);
-    res.status(500).json({ error: 'Terjadi kesalahan pada server/database.' });
+    res.status(500).json({ error: 'Kesalahan server' });
   }
 });
 
-// API 4: Hapus sesi
-app.delete('/api/sessions/:id', async (req, res) => {
-  try {
-    await db.run('DELETE FROM messages WHERE session_id = ?', [req.params.id]);
-    await db.run('DELETE FROM sessions WHERE id = ?', [req.params.id]);
-    res.json({ success: true });
-  } catch (error) {
-    res.status(500).json({ error: 'Gagal menghapus percakapan' });
-  }
+app.delete('/api/sessions/:id', requireAuth, async (req, res) => {
+  const session = await db.get('SELECT id FROM sessions WHERE id = ? AND user_id = ?', [req.params.id, req.session.userId]);
+  if (!session) return res.status(403).json({ error: 'Akses ditolak' });
+  await db.run('DELETE FROM messages WHERE session_id = ?', [req.params.id]);
+  await db.run('DELETE FROM sessions WHERE id = ?', [req.params.id]);
+  res.json({ success: true });
 });
 
-app.listen(port, () => {
-  console.log(`Server AI Assistant berjalan di http://localhost:${port}`);
-});
+app.listen(port, () => console.log(`Server berjalan di http://localhost:${port}`));
