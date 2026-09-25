@@ -1,62 +1,311 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - AI Chatbot</title>
-    <style>
-        body { font-family: sans-serif; background: #0f172a; color: #f8fafc; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: #1e293b; padding: 30px; border-radius: 12px; width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-        h2 { text-align: center; margin-bottom: 20px; }
-        input { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #334155; background: #0f172a; color: #fff; border-radius: 6px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #3b82f6; border: none; color: white; border-radius: 6px; font-weight: bold; cursor: pointer; margin-bottom: 8px; }
-        button:hover { background: #2563eb; }
-        .switch { background: #475569; }
-        .switch:hover { background: #334155; }
-        #errorMsg { color: #f87171; font-size: 14px; text-align: center; margin-bottom: 10px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Masuk - AI Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-main: #1C1B1A;
+      --bg-card: #262524;
+      --bg-input: #302F2D;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-focus: #C6613F;
+      --text: #FAF9F5;
+      --text-muted: #9E9C94;
+      --accent: #C6613F;
+      --accent-hover: #D86F4B;
+      --error: #E5534B;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Efek latar belakang bercahaya khas gaya aslimu */
+    .bg-glow {
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(198, 97, 63, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 0;
+      animation: pulseGlow 8s infinite alternate ease-in-out;
+      pointer-events: none;
+    }
+
+    @keyframes pulseGlow {
+      0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.6; }
+      100% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+    }
+
+    .auth-wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 440px;
+      padding: 24px;
+      animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .auth-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 40px 36px;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(10px);
+    }
+
+    .auth-header {
+      margin-bottom: 32px;
+      text-align: center;
+    }
+
+    .auth-header h1 {
+      font-family: 'Source Serif 4', serif;
+      font-size: 26px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+
+    .auth-header p {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .error-msg {
+      background-color: rgba(229, 83, 75, 0.1);
+      border: 1px solid rgba(229, 83, 75, 0.3);
+      color: var(--error);
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+      animation: shake 0.4s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+
+    .input-group {
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      padding: 14px 16px;
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+
+    input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(198, 97, 63, 0.15);
+    }
+
+    .btn {
+      width: 100%;
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      font-size: 15px;
+      cursor: pointer;
+      transition: background-color 0.2s ease, transform 0.1s ease;
+      margin-top: 8px;
+      box-shadow: 0 4px 12px rgba(198, 97, 63, 0.3);
+    }
+
+    .btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .toggle-container {
+      text-align: center;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 24px;
+    }
+
+    .toggle-container span {
+      color: var(--text);
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: underline;
+      transition: color 0.2s;
+    }
+
+    .toggle-container span:hover {
+      color: var(--accent);
+    }
+
+    .fade-anim {
+      animation: fadeIn 0.4s ease forwards;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
 <body>
-    <div class="card">
-        <h2 id="formTitle">Login</h2>
-        <div id="errorMsg"></div>
-        <form id="authForm">
-            <input type="text" id="username" placeholder="Username" required>
-            <input type="password" id="AuthPassword" placeholder="Password" required>
-            <button type="submit" id="submitBtn">Masuk</button>
-            <button type="button" class="switch" id="switchBtn" onclick="toggleMode()">Belum punya akun? Register</button>
-        </form>
+
+  <div class="bg-glow"></div>
+
+  <div class="auth-wrapper">
+    <div class="auth-card fade-anim" id="cardContainer">
+      <div class="auth-header">
+        <h1 id="formTitle">Selamat Datang</h1>
+        <p id="formSubtitle">Masuk untuk mulai menggunakan aplikasi.</p>
+      </div>
+
+      <div class="error-msg" id="errorMsg"></div>
+      
+      <div class="input-group">
+        <label>Username</label>
+        <input type="text" id="username" placeholder="Masukkan username" autocomplete="off">
+      </div>
+      
+      <div class="input-group">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="Masukkan password">
+      </div>
+      
+      <button class="btn" id="submitBtn">Masuk</button>
+      
+      <div class="toggle-container" id="toggleMode">
+        Belum punya akun? <span>Daftar</span>
+      </div>
     </div>
+  </div>
 
-    <script>
-        let isLogin = true;
+  <script>
+    let isLoginMode = true;
+    const formTitle = document.getElementById('formTitle');
+    const formSubtitle = document.getElementById('formSubtitle');
+    const submitBtn = document.getElementById('submitBtn');
+    const toggleMode = document.getElementById('toggleMode');
+    const errorMsg = document.getElementById('errorMsg');
+    const cardContainer = document.getElementById('cardContainer');
 
-        function toggleMode() {
-            isLogin = !isLogin;
-            document.getElementById('formTitle').innerText = isLogin ? 'Login' : 'Register';
-            document.getElementById('submitBtn').innerText = isLogin ? 'Masuk' : 'Daftar';
-            document.getElementById('switchBtn').innerText = isLogin ? 'Belum punya akun? Register' : 'Sudah punya akun? Login';
-        }
+    toggleMode.addEventListener('click', () => {
+      isLoginMode = !isLoginMode;
+      
+      cardContainer.classList.remove('fade-anim');
+      void cardContainer.offsetWidth; 
+      cardContainer.classList.add('fade-anim');
 
-        document.getElementById('authForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('AuthPassword').value;
-            const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+      if (isLoginMode) {
+        formTitle.innerText = 'Selamat Datang';
+        formSubtitle.innerText = 'Masuk untuk mulai menggunakan aplikasi.';
+        submitBtn.innerText = 'Masuk';
+        toggleMode.innerHTML = 'Belum punya akun? <span>Daftar</span>';
+      } else {
+        formTitle.innerText = 'Buat Akun Baru';
+        formSubtitle.innerText = 'Daftar untuk menyimpan riwayat obrolan.';
+        submitBtn.innerText = 'Daftar';
+        toggleMode.innerHTML = 'Sudah punya akun? <span>Masuk</span>';
+      }
+      errorMsg.style.display = 'none';
+      document.getElementById('username').value = '';
+      document.getElementById('password').value = '';
+    });
 
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
+    submitBtn.addEventListener('click', async () => {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
 
-            const data = await res.json();
-            if (res.ok) {
-                window.location.href = '/'; // Kalau sukses, lempar ke halaman utama (chat)
-            } else {
-                document.getElementById('errorMsg').innerText = data.error || 'Terjadi kesalahan';
-            }
+      if (!username || !password) {
+        errorMsg.innerText = 'Username dan password wajib diisi.';
+        errorMsg.style.display = 'block';
+        return;
+      }
+
+      const endpoint = isLoginMode ? '/api/auth/login' : '/api/auth/register';
+
+      try {
+        submitBtn.innerText = 'Memproses...';
+        submitBtn.style.opacity = '0.7';
+
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
         });
-    </script>
+        const data = await res.json();
+
+        if (res.ok) {
+          window.location.href = '/';
+        } else {
+          errorMsg.innerText = data.error || 'Terjadi kesalahan pada server.';
+          errorMsg.style.display = 'block';
+          submitBtn.innerText = isLoginMode ? 'Masuk' : 'Daftar';
+          submitBtn.style.opacity = '1';
+        }
+      } catch (e) {
+        errorMsg.innerText = 'Gagal terhubung ke server.';
+        errorMsg.style.display = 'block';
+        submitBtn.innerText = isLoginMode ? 'Masuk' : 'Daftar';
+        submitBtn.style.opacity = '1';
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        submitBtn.click();
+      }
+    });
+  </script>
 </body>
 </html>
